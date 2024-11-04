@@ -1,7 +1,8 @@
 #!/bin/bash
 
 # Define the container name
-CONTAINER_NAME="andypern/sauna-master"
+CONTAINER_NAME="sauna-master"
+REPO=andypern
 
 # Check if the container is running
 if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
@@ -15,4 +16,4 @@ fi
 
 # Start the container again
 echo "Starting container '$CONTAINER_NAME'..."
-docker run --privileged --name $CONTAINER_NAME --device /dev/gpiomem --device /sys/bus/w1/devices:/sys/bus/w1/devices -p 5000:5000 -d $CONTAINER_NAME
+docker run --privileged --name $CONTAINER_NAME --device /dev/gpiomem --device /sys/bus/w1/devices:/sys/bus/w1/devices -p 5000:5000 -d $REPO/$CONTAINER_NAME
