@@ -9,8 +9,12 @@ if [ "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
     echo "Container '$CONTAINER_NAME' is running. Stopping it..."
     # Stop the running container
     docker stop $CONTAINER_NAME
-    
-    # Optionally, remove the container (if you want to ensure a fresh start)
+fi
+
+# Check if the container exists (but is not running)
+if [ "$(docker ps -a -q -f name=$CONTAINER_NAME)" ]; then
+    echo "Container '$CONTAINER_NAME' exists. Removing it..."
+    # Remove the container
     docker rm $CONTAINER_NAME
 fi
 
