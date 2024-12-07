@@ -16,5 +16,44 @@
         <p>Temperature: {{ temperature }} °C</p>
         <p>Date/Time: {{ current_time }}</p>
     </div>
+    <div class="power-status">
+        <span class="status-indicator {% if power_status.is_on %}active{% endif %}">⬤</span>
+        {{ power_status.text }}
+    </div>
+    
+    <button id="powerButton" onclick="togglePower()" class="power-button">
+        {{ button_text }}
+    </button>
+    
+    <style>
+        .power-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status-indicator {
+            color: #ff0000;  /* Red when off */
+            font-size: 20px;
+        }
+        .status-indicator.active {
+            color: #00ff00;  /* Green when on */
+        }
+    </style>
+    
+    <script>
+    function togglePower() {
+        fetch('/toggle_power', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload the page to update the status
+                location.reload();
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+    </script>
 </body>
 </html>

@@ -5,11 +5,10 @@ FROM python:3.9-slim
 WORKDIR /app
 
 
-# Install the required Python libraries
-RUN pip install flask
 
 # Copy the w1 kernel modules (optional, based on the host system setup)
-RUN apt-get update && apt-get install -y kmod
+RUN apt-get update && apt-get install -y kmod gcc && \
+pip install flask RPi.GPIO
 
 # Copy the application files into the container
 COPY app.py /app
