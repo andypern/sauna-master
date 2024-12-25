@@ -20,4 +20,4 @@ fi
 
 # Start the container again
 echo "Starting container '$CONTAINER_NAME'..."
-docker run --privileged --restart always --name $CONTAINER_NAME --device /dev/gpiomem --device /sys/bus/w1/devices:/sys/bus/w1/devices -d $REPO/$CONTAINER_NAME
+docker run --privileged --restart always --name $CONTAINER_NAME --device /dev/gpiomem --device /sys/bus/w1/devices:/sys/bus/w1/devices -p 8501:8501 -p 8080:8080 -d $REPO/$CONTAINER_NAME
