@@ -60,9 +60,7 @@ EXPOSE 5000 8501 8080
 # Create a startup script
 COPY <<EOF /app/start.sh
 #!/bin/sh
-streamlit run streamlit_app.py --server.port=8501 --server.address=0.0.0.0 &
-python bottle_app.py &
-wait
+python bottle_app.py
 EOF
 
 RUN chmod +x /app/start.sh

@@ -14,7 +14,7 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Temperature</h5>
-                        <h2>{{ temperature }}°F</h2>
+                        <h2>${ temperature }°F</h2>
                     </div>
                 </div>
             </div>
@@ -22,9 +22,9 @@
                 <div class="card">
                     <div class="card-body">
                         <h5 class="card-title">Power Status</h5>
-                        <h2>{{ powerStatus }}</h2>
+                        <h2>${ powerStatus }</h2>
                         <button @click="togglePower" class="btn btn-primary">
-                            {{ powerStatus === 'POWER=ON' ? 'Turn Off Power' : 'Turn On Power' }}
+                            ${ powerStatus === 'POWER=ON' ? 'Turn Off Power' : 'Turn On Power' }
                         </button>
                     </div>
                 </div>
@@ -35,7 +35,7 @@
             <h3>Schedule Sauna</h3>
             <div v-if="scheduledTime">
                 <div class="alert alert-info">
-                    Sauna scheduled to turn on at: {{ scheduledTime }}
+                    Sauna scheduled to turn on at: ${ scheduledTime }
                     <button @click="cancelSchedule" class="btn btn-warning ml-2">Cancel Schedule</button>
                 </div>
             </div>
@@ -50,7 +50,7 @@
         </div>
 
         <div class="mt-4">
-            <p>Last updated: {{ currentTime }}</p>
+            <p>Last updated: ${ currentTime }</p>
             <button @click="refreshStatus" class="btn btn-secondary">Refresh Status</button>
         </div>
     </div>
@@ -65,6 +65,7 @@
                 currentTime: '',
                 scheduleDateTime: ''
             },
+            delimiters: ['${', '}'],
             methods: {
                 async refreshStatus() {
                     const response = await fetch('/api/status');

@@ -2,7 +2,7 @@ import glob
 import time
 import datetime
 import RPi.GPIO as GPIO
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import threading
 import json
 import os
@@ -20,9 +20,19 @@ def setup_gpio():
 def read_power_status():
     pin = 25
     GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    time.sleep(0.5)
-    state = GPIO.input(pin)
-    is_on = state != GPIO.HIGH
+    
+    # Take samples over 3 seconds
+    samples = []
+    num_samples = 12  # One sample every 0.25 seconds for 3 seconds
+    
+    for _ in range(num_samples):
+        time.sleep(0.25)
+        state = GPIO.input(pin)
+        samples.append(state != GPIO.HIGH)
+    
+    # Calculate the majority value
+    is_on = sum(samples) > len(samples) / 2
+    
     return {
         "text": "POWER=ON" if is_on else "POWER=OFF",
         "is_on": is_on
@@ -53,15 +63,22 @@ def toggle_power(turn_on=True):
     GPIO.setup(18, GPIO.OUT)
 
     if turn_on:
+        #press power button
         GPIO.output(17, GPIO.HIGH)
         time.sleep(1)
+        #depress power button
         GPIO.output(17, GPIO.LOW)
+        #press time up button
         GPIO.output(18, GPIO.HIGH)
+        #sleeping for 5 sec's means it will increase to max time.
         time.sleep(5)
+        #depress time up button
         GPIO.output(18, GPIO.LOW)
     else:
+        #press power button to turn off
         GPIO.output(17, GPIO.HIGH)
         time.sleep(1)
+        #depress power button.
         GPIO.output(17, GPIO.LOW)
 
 # Schedule functions
@@ -89,7 +106,7 @@ schedule_thread = None
 
 def schedule_power_on(target_time):
     global scheduled_time
-    while datetime.now(datetime.now().tzinfo) < target_time:
+    while datetime.now(timezone.utc) < target_time:
         time.sleep(1)
         current_schedule = load_schedule()
         if current_schedule != target_time:
@@ -115,14 +132,20 @@ def get_status():
         'temperature': round(temperature, 1),
         'power_status': power_status,
         'scheduled_time': current_schedule.isoformat() if current_schedule else None,
-        'current_time': datetime.now(datetime.now().tzinfo).isoformat()
+        'current_time': datetime.now(timezone.utc).isoformat()
     }
 
 @app.route('/api/power', method='POST')
 def toggle():
     power_status = read_power_status()
     toggle_power(not power_status["is_on"])
-    return {'success': True}
+    # Get the new status immediately after toggling
+    new_status = read_power_status()
+    return {
+        'success': True,
+        'message': 'Power turned ON' if new_status["is_on"] else 'Power turned OFF',
+        'power_status': new_status
+    }
 
 @app.route('/api/schedule', method='POST')
 def set_schedule():
@@ -134,8 +157,14 @@ def set_schedule():
         return {'error': 'Missing datetime parameter'}
     
     try:
-        target_time = datetime.fromisoformat(data['datetime'])
-        if target_time <= datetime.now(datetime.now().tzinfo):
+        # Remove the 'Z' suffix and handle timezone
+        target_time_str = data['datetime'].replace('Z', '+00:00')
+        target_time = datetime.fromisoformat(target_time_str)
+        
+        # Get current time with timezone
+        current_time = datetime.now(timezone.utc)
+        
+        if target_time <= current_time:
             response.status = 400
             return {'error': 'Please select a future time'}
         
@@ -165,7 +194,7 @@ if __name__ == '__main__':
         setup_gpio()
         # Load saved schedule on startup
         scheduled_time = load_schedule()
-        if scheduled_time and scheduled_time > datetime.now(datetime.now().tzinfo):
+        if scheduled_time and scheduled_time > datetime.now(timezone.utc):
             schedule_thread = threading.Thread(target=schedule_power_on, args=(scheduled_time,))
             schedule_thread.start()
             
