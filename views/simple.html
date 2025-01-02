@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sauna Control - Simple</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.14"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .status-box {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .temperature {
+            font-size: 48px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .power-status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 4px;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .power-on {
+            background: #28a745;
+            color: white;
+        }
+        .power-off {
+            background: #dc3545;
+            color: white;
+        }
+        .button {
+            display: block;
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .button-secondary {
+            background: #6c757d;
+        }
+        .message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .message-info {
+            background: #cce5ff;
+            color: #004085;
+        }
+        .message-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .time-info {
+            margin: 15px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div id="app" class="container">
+        <h1 style="text-align: center;">Sauna Control</h1>
+        
+        <!-- Status Display -->
+        <div class="status-box">
+            <div class="temperature">${ temperature != null ? Math.round(temperature) + '°F' : '--°F' }</div>
+            <div class="power-status" :class="powerStatus && powerStatus.is_on ? 'power-on' : 'power-off'">
+                ${ powerStatus && powerStatus.is_on ? 'ON' : 'OFF' }
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <button 
+            @click="togglePower" 
+            class="button" 
+            :disabled="isTogglingPower">
+            ${ powerStatus ? (powerStatus.is_on ? 'Turn Off' : 'Turn On') : 'Turn On' }
+        </button>
+
+        <button 
+            @click="increaseTime" 
+            class="button button-secondary" 
+            :disabled="!powerStatus || !powerStatus.is_on || isIncreasingTime">
+            Increase Time to 60 Minutes
+        </button>
+
+        <!-- Messages -->
+        <div v-if="processingMessage" class="message message-info">
+            ${ processingMessage }
+        </div>
+        <div v-if="powerMessage" class="message message-success">
+            ${ powerMessage }
+        </div>
+
+        <!-- Time Information -->
+        <div v-if="powerStatus.text === 'POWER=ON' && powerOnDuration != null" class="time-info">
+            <div>Running for: ${ formatDuration(powerOnDuration) }</div>
+            <div v-if="timeRemaining != null">Time remaining: ${ formatTimeRemaining(timeRemaining) }</div>
+        </div>
+
+        <div class="time-info">
+            <h3 style="text-align: center;">Schedule Sauna</h3>
+            <div v-if="scheduledTime" class="message message-info">
+                <div>Scheduled for: ${ scheduledTime }</div>
+                <button @click="cancelSchedule" class="button button-secondary">Cancel Schedule</button>
+            </div>
+            <div v-else>
+                <input 
+                    type="datetime-local" 
+                    v-model="scheduleDateTime" 
+                    style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px;">
+                <button @click="setSchedule" class="button">Schedule Power On</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Vue({
+            el: '#app',
+            delimiters: ['${', '}'],
+            data: {
+                temperature: null,
+                powerStatus: 'POWER=OFF',
+                powerOnDuration: null,
+                timeRemaining: null,
+                isTogglingPower: false,
+                isIncreasingTime: false,
+                processingMessage: '',
+                powerMessage: '',
+                refreshInterval: null,
+                scheduleDateTime: '',
+                scheduledTime: null,
+            },
+            methods: {
+                async refreshStatus() {
+                    try {
+                        const response = await fetch('/api/status');
+                        const data = await response.json();
+                        this.temperature = data.temperature;
+                        this.powerStatus = data.power_status;
+                        this.powerOnDuration = data.power_on_duration;
+                        this.timeRemaining = data.time_remaining;
+                    } catch (error) {
+                        console.error('Error refreshing status:', error);
+                    }
+                },
+                async togglePower() {
+                    this.isTogglingPower = true;
+                    const desiredState = this.powerStatus !== 'POWER=ON';
+                    this.processingMessage = desiredState ? 'Turning on...' : 'Turning off...';
+                    
+                    try {
+                        const response = await fetch('/api/power', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ power: desiredState })
+                        });
+                        const data = await response.json();
+                        this.powerMessage = data.message;
+                        setTimeout(() => this.powerMessage = '', 3000);
+                        await this.refreshStatus();
+                    } catch (error) {
+                        this.powerMessage = 'Error toggling power';
+                    } finally {
+                        this.isTogglingPower = false;
+                        this.processingMessage = '';
+                    }
+                },
+                async increaseTime() {
+                    this.isIncreasingTime = true;
+                    this.processingMessage = 'Increasing time...';
+                    
+                    try {
+                        const response = await fetch('/api/increase-time', {
+                            method: 'POST'
+                        });
+                        const data = await response.json();
+                        this.powerMessage = data.message;
+                        setTimeout(() => this.powerMessage = '', 3000);
+                    } catch (error) {
+                        this.powerMessage = 'Error increasing time';
+                    } finally {
+                        this.isIncreasingTime = false;
+                        this.processingMessage = '';
+                        await this.refreshStatus();
+                    }
+                },
+                formatDuration(seconds) {
+                    if (!seconds) return '0s';
+                    const h = Math.floor(seconds / 3600);
+                    const m = Math.floor((seconds % 3600) / 60);
+                    const s = Math.floor(seconds % 60);
+                    return [
+                        h > 0 ? h + 'h' : '',
+                        m > 0 ? m + 'm' : '',
+                        s + 's'
+                    ].filter(Boolean).join(' ');
+                },
+                formatTimeRemaining(seconds) {
+                    if (!seconds || seconds <= 0) return "Time expired";
+                    const m = Math.floor(seconds / 60);
+                    const s = Math.floor(seconds % 60);
+                    return `${m}:${s.toString().padStart(2, '0')}`;
+                },
+                async setSchedule() {
+                    try {
+                        const response = await fetch('/api/schedule', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ datetime: new Date(this.scheduleDateTime).toISOString() })
+                        });
+                        const data = await response.json();
+                        if (data.error) {
+                            this.powerMessage = data.error;
+                        } else {
+                            await this.refreshStatus();
+                        }
+                    } catch (error) {
+                        console.error('Error setting schedule:', error);
+                        this.powerMessage = 'Error setting schedule';
+                    }
+                },
+                async cancelSchedule() {
+                    try {
+                        await fetch('/api/schedule', { method: 'DELETE' });
+                        await this.refreshStatus();
+                    } catch (error) {
+                        console.error('Error canceling schedule:', error);
+                        this.powerMessage = 'Error canceling schedule';
+                    }
+                }
+            },
+            mounted() {
+                this.refreshStatus();
+                this.refreshInterval = setInterval(this.refreshStatus, 5000);
+            },
+            beforeDestroy() {
+                if (this.refreshInterval) {
+                    clearInterval(this.refreshInterval);
+                }
+            }
+        });
+    </script>
+</body>
+</html> 
