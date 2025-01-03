@@ -130,7 +130,7 @@
         <div class="time-info">
             <h3 style="text-align: center;">Schedule Sauna</h3>
             <div v-if="scheduledTime" class="message message-info">
-                <div>Scheduled for: ${ scheduledTime }</div>
+                <div>Scheduled for: ${ formatScheduledTime(scheduledTime) }</div>
                 <button @click="cancelSchedule" class="button button-secondary">Cancel Schedule</button>
             </div>
             <div v-else>
@@ -138,7 +138,12 @@
                     type="datetime-local" 
                     v-model="scheduleDateTime" 
                     style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px;">
-                <button @click="setSchedule" class="button">Schedule Power On</button>
+                <button 
+                    @click="setSchedule" 
+                    class="button" 
+                    :disabled="isSettingSchedule">
+                    ${ isSettingSchedule ? 'Setting Schedule...' : 'Schedule Power On' }
+                </button>
             </div>
         </div>
     </div>
@@ -159,6 +164,8 @@
                 refreshInterval: null,
                 scheduleDateTime: '',
                 scheduledTime: null,
+                isSettingSchedule: false,
+                scheduleMessage: '',
             },
             methods: {
                 async refreshStatus() {
@@ -169,13 +176,14 @@
                         this.powerStatus = data.power_status;
                         this.powerOnDuration = data.power_on_duration;
                         this.timeRemaining = data.time_remaining;
+                        this.scheduledTime = data.scheduled_time;
                     } catch (error) {
                         console.error('Error refreshing status:', error);
                     }
                 },
                 async togglePower() {
                     this.isTogglingPower = true;
-                    const desiredState = this.powerStatus !== 'POWER=ON';
+                    const desiredState = !this.powerStatus.is_on;
                     this.processingMessage = desiredState ? 'Turning on...' : 'Turning off...';
                     
                     try {
@@ -231,7 +239,15 @@
                     const s = Math.floor(seconds % 60);
                     return `${m}:${s.toString().padStart(2, '0')}`;
                 },
+                formatScheduledTime(isoString) {
+                    if (!isoString) return '';
+                    const date = new Date(isoString);
+                    return date.toLocaleString();
+                },
                 async setSchedule() {
+                    this.isSettingSchedule = true;
+                    this.scheduleMessage = '';
+                    
                     try {
                         const response = await fetch('/api/schedule', {
                             method: 'POST',
@@ -239,23 +255,31 @@
                             body: JSON.stringify({ datetime: new Date(this.scheduleDateTime).toISOString() })
                         });
                         const data = await response.json();
+                        
                         if (data.error) {
                             this.powerMessage = data.error;
                         } else {
+                            this.powerMessage = data.message;
                             await this.refreshStatus();
                         }
                     } catch (error) {
                         console.error('Error setting schedule:', error);
                         this.powerMessage = 'Error setting schedule';
+                    } finally {
+                        this.isSettingSchedule = false;
+                        setTimeout(() => this.powerMessage = '', 3000);
                     }
                 },
                 async cancelSchedule() {
                     try {
                         await fetch('/api/schedule', { method: 'DELETE' });
+                        this.powerMessage = 'Schedule cancelled successfully';
                         await this.refreshStatus();
+                        setTimeout(() => this.powerMessage = '', 3000);
                     } catch (error) {
                         console.error('Error canceling schedule:', error);
                         this.powerMessage = 'Error canceling schedule';
+                        setTimeout(() => this.powerMessage = '', 3000);
                     }
                 }
             },
