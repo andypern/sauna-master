@@ -197,15 +197,15 @@ def calculate_time_info():
 # Web routes
 @app.route('/')
 def index():
-    return template('index.html')
+    return template('simple.html')
 
 @app.route('/simple')
 def simple():
     return template('simple.html')
 
-@app.route('/static/<filepath:path>')
-def serve_static(filepath):
-    return static_file(filepath, root='./static')
+@app.route('/old')
+def simple():
+    return template('index.html')
 
 # API routes
 @app.route('/api/status')
